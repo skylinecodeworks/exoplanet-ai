@@ -1,0 +1,16 @@
+[project]
+name = "exoplanet-ai"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "jupyter>=1.1.1",
+    "lightkurve>=2.5.0",
+    "matplotlib>=3.10.1",
+    "numpy>=2.2.4",
+    "pandas>=2.2.3",
+    "scikit-learn>=1.6.1",
+    "six>=1.17.0",
+    "torch>=2.6.0",
+]
