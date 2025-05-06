@@ -7,7 +7,6 @@ import matplotlib.pyplot as plt
 import asyncio
 from lightkurve import search_lightcurvefile, LightCurve, search_lightcurve
 import torch.nn as nn
-import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader
 from textual.app import App, ComposeResult
 from textual.containers import Horizontal
@@ -219,27 +218,27 @@ def predict(target):
 
 
 # ---------- INTERFAZ CON TEXTUAL ----------
+# ---------- INTERFAZ CON TEXTUAL ----------
 class TICSelectorApp(App):
-
     MAX_OPTIONS = 20
 
     def __init__(self):
         super().__init__()
         self.selected_confirmed = []
         self.selected_false = []
-        self.log_text = ""  # Variable para acumular el log
+        self.log_text = ""
         self.log_area = None
 
     def compose(self) -> ComposeResult:
         yield Header()
         yield Static("Seleccioná TICs confirmados:")
-        self.confirmed_select = Select(options=[])
+        self.confirmed_select = Select([])
         self.confirmed_display = Horizontal()
         yield self.confirmed_select
         yield self.confirmed_display
 
         yield Static("Seleccioná TICs falsos positivos:")
-        self.false_select = Select(options=[])
+        self.false_select = Select([])
         self.false_display = Horizontal()
         yield self.false_select
         yield self.false_display
@@ -253,20 +252,18 @@ class TICSelectorApp(App):
 
         yield Footer()
 
-    def update_log(self, message):
-        """Actualiza el log interno y el widget log_area sin interpretar markup."""
+    def update_log(self, message: str):
         from datetime import datetime
         timestamp = datetime.now().strftime("[%H:%M:%S]")
         full_message = f"{timestamp} {message}"
         self.log_text += full_message + "\n"
-        # Escapeamos el contenido para evitar el parsing de markup
         self.log_area.update(Text(escape(self.log_text)))
 
     async def on_mount(self) -> None:
         self.update_log("On Mount")
 
-        def generate_tic_select_options(tic_ids, max_options=20):
-            return [(f"TIC {tic_id}", f"{tic_id}") for tic_id in tic_ids[:max_options]]
+        def generate_tic_select_options(tic_ids):
+            return [(f"TIC {tic}", str(tic)) for tic in tic_ids[: self.MAX_OPTIONS]]
 
         confirmed_tics = await asyncio.to_thread(get_confirmed_tics)
         false_tics = await asyncio.to_thread(get_false_positives)
@@ -275,12 +272,11 @@ class TICSelectorApp(App):
         options_confirmed = generate_tic_select_options(confirmed_tics)
         options_false = generate_tic_select_options(false_tics)
 
-        print("Opciones confirmadas:", options_confirmed)
-        print("Opciones falsos positivos:", options_false)
+        # Poblar los Select usando set_options
+        self.confirmed_select.set_options(options_confirmed)  # tiempo de ejecución OK
+        self.false_select.set_options(options_false)
 
-        self.confirmed_select.options = options_confirmed
-        self.false_select.options = options_false
-
+        # Refrescar UI
         self.confirmed_select.refresh()
         self.false_select.refresh()
 
@@ -294,19 +290,18 @@ class TICSelectorApp(App):
                 self.selected_confirmed.append(tic)
                 self.confirmed_display.mount(Label(f"TIC {tic}"))
                 self.update_log(f"TIC confirmado seleccionado: {tic}")
-        elif event.select is self.false_select:
+        else:
             if tic not in self.selected_false:
                 self.selected_false.append(tic)
                 self.false_display.mount(Label(f"TIC {tic}"))
                 self.update_log(f"TIC falso positivo seleccionado: {tic}")
 
-    def on_button_pressed(self, event: Button.Pressed):
+    def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "download_button":
-            self.update_log(f"Descargando y entrenando curvas de luz para {len(self.selected_confirmed)} TICs confirmados y {len(self.selected_false)} falsos positivos...")
-            #run_training(self.selected_confirmed, self.selected_false)
-            #predict(TARGET)
-            #self.update_log(f"Entrenando con {len(self.selected_confirmed)} TICs confirmados y {len(self.selected_false)} falsos positivos...")
-            #run_training(self.selected_confirmed, self.selected_false)
+            self.update_log(
+                f"Descargando y entrenando curvas de luz para {len(self.selected_confirmed)} confirmados y {len(self.selected_false)} falsos positivos..."
+            )
+            # Aquí ejecutarías run_training y predict
         elif event.button.id == "clear_logs":
             self.log_text = ""
             self.log_area.update(Text("Log de eventos:", escape=True))
@@ -314,6 +309,5 @@ class TICSelectorApp(App):
 # ---------- EJECUCIÓN ----------
 if __name__ == "__main__":
     log_console("Inicio del selector interactivo de TICs para detección de exoplanetas")
-    app = TICSelectorApp()
-    app.run()
+    TICSelectorApp().run()
     log_console("Proceso finalizado.")
